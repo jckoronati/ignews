@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { Readable } from 'stream';
 import Stripe from "stripe";
 import { stripe } from "../../services/stripe";
+import { saveSubscription } from "./_lib/manageSubscription";
 
 async function buffer(readable: Readable) {
     const chunks = [];
@@ -22,8 +23,11 @@ export const config = {
     }
 }
 
+//TODO Realizar novos eventos
 const relevantEvents = new Set([
-    'checkout.session.completed'
+    'checkout.session.completed',
+    'customer.subscription.updated',
+    'customer.subscription.deleted'
 ]);
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -42,13 +46,40 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
         const { type } = event;
 
         if(relevantEvents.has(type)) {
-            //TODO
-            console.log('Evento recebido', event);
+            try {
+                switch(type) {
+                    case 'customer.subscription.updated':
+                    case 'customer.subscription.deleted':
+                        const subscription = event.data.object as Stripe.Subscription;
+
+                        await saveSubscription(
+                            subscription.id,
+                            subscription.customer.toString(),
+                            false
+                        );
+
+                        break;
+                    case 'checkout.session.completed':
+                        const checkoutSessions = event.data.object as Stripe.Checkout.Session;
+                        
+                        await saveSubscription(
+                            checkoutSessions.subscription.toString(), 
+                            checkoutSessions.customer.toString(),
+                            true
+                        );
+                        
+                        break;
+                    default:
+                        throw new Error("Unhandled event.");                    
+                }
+            } catch (error) {
+                return res.json({ error: 'Webhook handler failed.'})
+            }
         }
 
         res.json({ received: true });
     } else {
         res.setHeader('Allow', 'POST');
-        res.status(400).end('Method no allowed!');
+        res.status(405).end('Method not allowed!');
     }
 }

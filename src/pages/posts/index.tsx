@@ -1,6 +1,7 @@
 // Next
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
+import Link from 'next/link';
 
 // Services
 import { getPrismicClient } from '../../services/prismic';
@@ -24,21 +25,23 @@ interface PostsProps {
 }
 
 export default function Posts({ posts }: PostsProps) {
-    return(
+    return (
         <>
             <Head>
                 <title>Posts | Ignews</title>
             </Head>
             <main className={styles.container}>
                 <div className={styles.posts}>
-                    { posts.map((post, i) => (
-                        <a key={i} href="#">
-                            <time>{post.updatedAt}</time>
-                            <strong>{post.title}</strong>
-                            <p>{post.excerpt}</p>
-                        </a>
-                    )) }
-                </div>                
+                    {posts.map((post, i) => (
+                        <Link key={i} href={`posts/${post.slug}`}>
+                            <a>
+                                <time>{post.updatedAt}</time>
+                                <strong>{post.title}</strong>
+                                <p>{post.excerpt}</p>
+                            </a>
+                        </Link>
+                    ))}
+                </div>
             </main>
         </>
     );
@@ -46,7 +49,7 @@ export default function Posts({ posts }: PostsProps) {
 
 export const getStaticProps: GetStaticProps = async () => {
     const prismic = getPrismicClient();
-    
+
     const response = await prismic.query([
         Prismic.predicates.at('document.type', 'publication')
     ], {
